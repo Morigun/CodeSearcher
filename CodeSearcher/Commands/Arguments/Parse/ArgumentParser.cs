@@ -9,14 +9,18 @@ namespace CodeSearcher.Commands.Arguments.Parse
     public class ArgumentParser
     {
         public ICommand Command { get; set; }
-        public string[] InputLines { get; set; }
-        public ArgumentParser(ICommand command, string[] inputLines)
+        public string?[]? InputLines { get; set; }
+        private string mergedLine { get; set; }
+        public ArgumentParser(ICommand command, string?[]? inputLines)
         {
             Command = command;
             InputLines = inputLines;
         }
         public void Parse()
         {
+            if (InputLines == null)
+                return;
+            MergeInputLines();
             foreach (var argument in Command.Arguments)
             {
                 if (!argument.HasValue)
@@ -25,30 +29,11 @@ namespace CodeSearcher.Commands.Arguments.Parse
                 if (startPosition.StrIndex == -1)
                     continue;
                 ArgumentPosition endPosition = FindEndPosition(argument, startPosition);
-                var startPath = InputLines[startPosition.StrNumber].Substring(startPosition.StrIndex);
-                if (startPosition.StrNumber == endPosition.StrNumber)
-                {
-                    if (endPosition.StrIndex == -1)
-                        argument.Value = startPath;
-                    else
-                        argument.Value = startPath.Substring(0, endPosition.StrIndex - startPosition.StrIndex);
-                }
+                var startPath = mergedLine[startPosition.StrIndex..];
+                if (endPosition.StrIndex == -1)
+                    argument.Value = startPath;
                 else
-                {
-                    StringBuilder argumentValue = new StringBuilder();
-                    for (int i = startPosition.StrNumber; i < InputLines.Length; i++)
-                    {
-                        string tmpArgumentString = string.Empty;
-                        if (i == startPosition.StrNumber)
-                            tmpArgumentString = InputLines[i].Substring(startPosition.StrNumber);
-                        else if (i == endPosition.StrNumber && endPosition.StrIndex != -1)
-                            tmpArgumentString = InputLines[i].Substring(0, endPosition.StrIndex);
-                        else
-                            tmpArgumentString = InputLines[i];
-                        argumentValue.Append(ReplaceEndString(tmpArgumentString));
-                    }
-                    argument.Value = argumentValue.ToString();
-                }
+                    argument.Value = startPath?[..(endPosition.StrIndex - startPosition.StrIndex)];
                 //Удалим команду
                 argument.Value = ReplaceCommand(argument);
                 //Удалим пробел
@@ -57,10 +42,15 @@ namespace CodeSearcher.Commands.Arguments.Parse
                 argument.ValueHandle();
             }
         }
+        private void MergeInputLines()
+        {
+            var result = string.Join("", InputLines);
+            mergedLine = result.Replace("/", "");
+        }
         private static string ReplaceEndSpace(IArgument argument)
         {
             if (argument.Value!.EndsWith(' '))
-                return argument.Value.Substring(0, argument.Value.Length - 1);
+                return argument.Value[..^1];
             return argument.Value;
         }
         private static string ReplaceCommand(IArgument argument)
@@ -68,50 +58,35 @@ namespace CodeSearcher.Commands.Arguments.Parse
             return argument.Value!.Replace(argument.Name, "").Substring(1);
         }
 
-        private static string ReplaceEndString(string tmpArgumentString)
-        {
-            if (tmpArgumentString.EndsWith('/'))
-                return tmpArgumentString.Substring(0, tmpArgumentString.Length - 1);
-            return tmpArgumentString;
-        }
-
         private ArgumentPosition FindStartPosition(IArgument argument)
         {
             ArgumentPosition position = new ArgumentPosition();
-            for (int i = 0; i < InputLines.Length; i++)
+            var tmpIndexOf = mergedLine.IndexOf(argument.Name);
+            if (tmpIndexOf != -1)
             {
-                var tmpIndexOf = InputLines[i].IndexOf(argument.Name);
-                if (tmpIndexOf != -1)
-                {
-                    position.StrIndex = tmpIndexOf;
-                    position.StrNumber = i;
-                    break;
-                }
+                position.StrIndex = tmpIndexOf;
+                position.StrNumber = 0;
             }
-
+            
             return position;
         }
         private ArgumentPosition FindEndPosition(IArgument argument, ArgumentPosition startPosition)
         {
             ArgumentPosition position = new ArgumentPosition();
             
-            for (int i = startPosition.StrNumber; i < InputLines.Length; i++)
+            position.StrNumber = 0;
+            int minOther = -1;
+            foreach (var otherArgument in Command.Arguments.Where(arg => arg.Name != argument.Name))
             {
-                position.StrNumber = i;
-                int minOther = -1;
-                foreach (var otherArgument in Command.Arguments.Where(arg => arg.Name != argument.Name))
-                {
-                    var nextArgIndex = InputLines[i].Substring(startPosition.StrIndex).IndexOf(otherArgument.Name);
-                    if (minOther == -1 && nextArgIndex != -1)
-                        minOther = nextArgIndex;
-                    else if (minOther > nextArgIndex)
-                        minOther = nextArgIndex;
-                }
-                if (minOther != -1)
-                {
-                    position.StrIndex = minOther;
-                    break;
-                }
+                var nextArgIndex = mergedLine[startPosition.StrIndex..].IndexOf(otherArgument.Name);
+                if (minOther == -1 && nextArgIndex != -1)
+                    minOther = startPosition.StrIndex + nextArgIndex;
+                else if (minOther > startPosition.StrIndex + nextArgIndex && nextArgIndex != -1)
+                    minOther = startPosition.StrIndex + nextArgIndex;
+            }
+            if (minOther != -1)
+            {
+                position.StrIndex = minOther;
             }
 
             return position;

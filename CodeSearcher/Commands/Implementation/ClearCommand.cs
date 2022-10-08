@@ -8,13 +8,13 @@ using System.Threading.Tasks;
 
 namespace CodeSearcher.Commands.Implementation
 {
-    public class ExitCommand : ICommand
+    public class ClearCommand : ICommand
     {
-        public IArgument[] Arguments { get; }
+        public IArgument[] Arguments { get; } = Array.Empty<IArgument>();
 
         public void Execute()
         {
-            Environment.Exit(0);
+            Console.Clear();
         }
     }
 }

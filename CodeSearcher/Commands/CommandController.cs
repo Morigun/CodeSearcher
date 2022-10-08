@@ -13,7 +13,9 @@ namespace CodeSearcher.Commands
     {
         public static Dictionary<string, ICommand> Commands = new Dictionary<string, ICommand>
         {
-            { "SEARCH", new SearchCommand() }
+            { "SEARCH", new SearchCommand() },
+            { "EXIT", new ExitCommand() },
+            { "CLEAR", new ClearCommand() }
         };
         private static ErrorCommand Error = new ErrorCommand();
         public static bool TryGetCommand(string? name, out ICommand command)

@@ -1,4 +1,5 @@
 ﻿using CodeSearcher.Commands;
+using CodeSearcher.Commands.Arguments.Parse;
 using CodeSearcher.Commands.Implementation;
 
 using System.Text;
@@ -11,6 +12,8 @@ internal class Program
         CommandController.TryGetCommand(CommandController.ParseCommand(consoleArgs?[0]), out ICommand command);
         while (command.GetType() != typeof(ExitCommand))
         {
+            ArgumentParser parser = new ArgumentParser(command, consoleArgs?.ToArray());
+            parser.Parse();
             command.Execute();
             consoleArgs!.Clear();
             consoleArgs = GetConsoleArgs();
